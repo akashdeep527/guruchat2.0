@@ -188,12 +188,20 @@ const HomePage = () => {
 
       if (error) throw error;
 
-      toast({
-        title: action === 'accept' ? "Chat request accepted!" : "Chat request rejected",
-        description: action === 'accept' 
-          ? "You can now start chatting with the client." 
-          : "The request has been declined."
-      });
+      if (action === 'accept') {
+        toast({
+          title: "Chat request accepted!",
+          description: "Redirecting to chat...",
+        });
+        
+        // Navigate to chat page
+        navigate(`/chat/${sessionId}`);
+      } else {
+        toast({
+          title: "Chat request rejected",
+          description: "The request has been declined."
+        });
+      }
 
       // Refresh pending requests
       fetchPendingRequests();
