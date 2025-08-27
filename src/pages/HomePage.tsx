@@ -46,14 +46,54 @@ const HomePage = () => {
   const [isLoadingHelpers, setIsLoadingHelpers] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
 
   useEffect(() => {
     fetchHelpers();
     checkAdminRole();
     if (user && profile?.is_helper) {
       fetchPendingRequests();
+      fetchProfessionalSessions();
+    }
+    if (user && !profile?.is_helper) {
+      fetchClientSessions();
     }
   }, [user, profile]);
+
+  // Real-time subscription for chat session updates (for clients)
+  useEffect(() => {
+    if (!user || profile?.is_helper) return;
+
+    const channel = supabase
+      .channel('client-sessions')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_sessions',
+          filter: `client_id=eq.${user.id}`
+        },
+        (payload) => {
+          const session = payload.new as any;
+          if (session.status === 'active' && payload.old.status === 'pending') {
+            toast({
+              title: "Chat request accepted!",
+              description: "Your chat request has been accepted. Redirecting to chat...",
+            });
+            // Navigate to chat after a short delay
+            setTimeout(() => {
+              navigate(`/chat/${session.id}`);
+            }, 1500);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, profile, navigate, toast]);
 
   const checkAdminRole = async () => {
     if (!user) return;
@@ -140,6 +180,86 @@ const HomePage = () => {
     }
   };
 
+  // Fetch client's chat sessions (for chat history)
+  const fetchClientSessions = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('client_id', user.id)
+        .in('status', ['active', 'completed'])
+        .order('created_at', { ascending: false });
+
+      if (sessionsError) throw sessionsError;
+
+      if (!sessions || sessions.length === 0) {
+        setChatHistory([]);
+        return;
+      }
+
+      // Get helper profiles for the sessions
+      const helperIds = sessions.map(session => session.helper_id);
+      const { data: helperProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', helperIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const sessionsWithHelpers = sessions.map(session => ({
+        ...session,
+        helper: helperProfiles?.find(profile => profile.user_id === session.helper_id)
+      }));
+
+      setChatHistory(sessionsWithHelpers);
+    } catch (error) {
+      console.error('Error fetching client sessions:', error);
+    }
+  };
+
+  // Fetch professional's chat sessions (for chat history)
+  const fetchProfessionalSessions = async () => {
+    if (!user || !profile?.is_helper) return;
+    
+    try {
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('helper_id', user.id)
+        .in('status', ['active', 'completed'])
+        .order('created_at', { ascending: false });
+
+      if (sessionsError) throw sessionsError;
+
+      if (!sessions || sessions.length === 0) {
+        setChatHistory([]);
+        return;
+      }
+
+      // Get client profiles for the sessions
+      const clientIds = sessions.map(session => session.client_id);
+      const { data: clientProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', clientIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const sessionsWithClients = sessions.map(session => ({
+        ...session,
+        client: clientProfiles?.find(profile => profile.user_id === session.client_id)
+      }));
+
+      setChatHistory(sessionsWithClients);
+    } catch (error) {
+      console.error('Error fetching professional sessions:', error);
+    }
+  };
+
   const startChat = async (helperId: string, helperRate: number) => {
     if (!user || !profile) return;
 
@@ -205,6 +325,7 @@ const HomePage = () => {
 
       // Refresh pending requests
       fetchPendingRequests();
+      fetchProfessionalSessions();
     } catch (error: any) {
       console.error('Error handling chat request:', error);
       toast({
@@ -429,10 +550,119 @@ const HomePage = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Chat History for Professionals */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  Chat History
+                </CardTitle>
+                <CardDescription>
+                  Your previous and ongoing chat sessions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {chatHistory.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    No chat sessions yet
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {chatHistory.map((session) => (
+                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                           onClick={() => navigate(`/chat/${session.id}`)}>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={session.client?.avatar_url} />
+                            <AvatarFallback>
+                              {session.client?.display_name?.charAt(0) || 'C'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{session.client?.display_name || 'Client'}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Rate: ₹{session.hourly_rate / 100}/hour
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.created_at).toLocaleString()}
+                              {session.duration_minutes > 0 && ` • ${session.duration_minutes} minutes`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={session.status === 'active' ? 'default' : 'secondary'}>
+                            {session.status}
+                          </Badge>
+                          {session.status === 'active' && (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              Live
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         ) : (
-          // Client Dashboard - Browse Professionals
+          // Client Dashboard - Browse Professionals & Chat History
           <div className="space-y-6">
+            {/* Chat History for Clients */}
+            {chatHistory.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5" />
+                    Your Chat Sessions
+                  </CardTitle>
+                  <CardDescription>
+                    Your previous and ongoing conversations with professionals
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {chatHistory.map((session) => (
+                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                           onClick={() => navigate(`/chat/${session.id}`)}>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={session.helper?.avatar_url} />
+                            <AvatarFallback>
+                              {session.helper?.display_name?.charAt(0) || 'H'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{session.helper?.display_name || 'Professional'}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Rate: ₹{session.hourly_rate / 100}/hour
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.created_at).toLocaleString()}
+                              {session.duration_minutes > 0 && ` • ${session.duration_minutes} minutes`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={session.status === 'active' ? 'default' : 'secondary'}>
+                            {session.status}
+                          </Badge>
+                          {session.status === 'active' && (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              Live
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Browse Professionals Section */}
             <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-2xl font-bold">Find Professional Help</h2>
