@@ -15,10 +15,12 @@ import {
   Settings,
   Users,
   Zap,
-  Search
+  Search,
+  Shield
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface Helper {
   id: string;
@@ -36,13 +38,33 @@ interface Helper {
 const HomePage = () => {
   const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingHelpers, setIsLoadingHelpers] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     fetchHelpers();
-  }, []);
+    checkAdminRole();
+  }, [user]);
+
+  const checkAdminRole = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin'
+      });
+
+      if (!error && data) {
+        setIsAdmin(true);
+      }
+    } catch (error) {
+      console.error('Error checking admin role:', error);
+    }
+  };
 
   const fetchHelpers = async () => {
     try {
@@ -138,6 +160,17 @@ const HomePage = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              {isAdmin && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/admin')}
+                  className="gap-2"
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin Panel
+                </Button>
+              )}
               <Avatar>
                 <AvatarImage src={profile?.avatar_url} />
                 <AvatarFallback>
