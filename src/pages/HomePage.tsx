@@ -104,18 +104,37 @@ const HomePage = () => {
     if (!user || !profile?.is_helper) return;
     
     try {
-      const { data, error } = await supabase
+      // First get the chat sessions
+      const { data: sessions, error: sessionsError } = await supabase
         .from('chat_sessions')
-        .select(`
-          *,
-          client:profiles!chat_sessions_client_id_fkey(display_name, avatar_url)
-        `)
+        .select('*')
         .eq('helper_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setPendingRequests(data || []);
+      if (sessionsError) throw sessionsError;
+
+      if (!sessions || sessions.length === 0) {
+        setPendingRequests([]);
+        return;
+      }
+
+      // Get client profiles for the sessions
+      const clientIds = sessions.map(session => session.client_id);
+      const { data: clientProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', clientIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const requestsWithClients = sessions.map(session => ({
+        ...session,
+        client: clientProfiles?.find(profile => profile.user_id === session.client_id)
+      }));
+
+      setPendingRequests(requestsWithClients);
     } catch (error) {
       console.error('Error fetching pending requests:', error);
     }
