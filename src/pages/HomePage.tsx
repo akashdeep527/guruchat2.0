@@ -16,8 +16,18 @@ import {
   Users,
   Zap,
   Search,
-  Shield
+  Shield,
+  ChevronDown,
+  History
 } from 'lucide-react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -551,135 +561,163 @@ const HomePage = () => {
               </CardContent>
             </Card>
 
-            {/* Chat History for Professionals */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5" />
-                  Chat History
-                </CardTitle>
-                <CardDescription>
-                  Your previous and ongoing chat sessions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {chatHistory.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">
-                    No chat sessions yet
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {chatHistory.map((session) => (
-                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                           onClick={() => navigate(`/chat/${session.id}`)}>
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarImage src={session.client?.avatar_url} />
-                            <AvatarFallback>
-                              {session.client?.display_name?.charAt(0) || 'C'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{session.client?.display_name || 'Client'}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Rate: ₹{session.hourly_rate / 100}/hour
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(session.created_at).toLocaleString()}
-                              {session.duration_minutes > 0 && ` • ${session.duration_minutes} minutes`}
-                            </p>
+            {/* Chat History Dropdown for Professionals */}
+            <div className="flex justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <History className="h-4 w-4" />
+                    Chat History
+                    {chatHistory.length > 0 && (
+                      <Badge variant="secondary" className="ml-1">
+                        {chatHistory.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 bg-card border border-border shadow-lg">
+                  <DropdownMenuLabel className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Your Chat Sessions
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {chatHistory.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground text-sm">
+                      No chat sessions yet
+                    </div>
+                  ) : (
+                    <div className="max-h-80 overflow-y-auto">
+                      {chatHistory.map((session) => (
+                        <DropdownMenuItem 
+                          key={session.id} 
+                          className="p-3 cursor-pointer focus:bg-muted"
+                          onClick={() => navigate(`/chat/${session.id}`)}
+                        >
+                          <div className="flex items-center gap-3 w-full">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={session.client?.avatar_url} />
+                              <AvatarFallback className="text-xs">
+                                {session.client?.display_name?.charAt(0) || 'C'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">
+                                {session.client?.display_name || 'Client'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                ₹{session.hourly_rate / 100}/hour
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(session.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge 
+                                variant={session.status === 'active' ? 'default' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {session.status}
+                              </Badge>
+                              {session.status === 'active' && (
+                                <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                                  Live
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={session.status === 'active' ? 'default' : 'secondary'}>
-                            {session.status}
-                          </Badge>
-                          {session.status === 'active' && (
-                            <Badge variant="outline" className="text-green-600 border-green-600">
-                              Live
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         ) : (
           // Client Dashboard - Browse Professionals & Chat History
           <div className="space-y-6">
-            {/* Chat History for Clients */}
-            {chatHistory.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5" />
-                    Your Chat Sessions
-                  </CardTitle>
-                  <CardDescription>
-                    Your previous and ongoing conversations with professionals
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {chatHistory.map((session) => (
-                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                           onClick={() => navigate(`/chat/${session.id}`)}>
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarImage src={session.helper?.avatar_url} />
-                            <AvatarFallback>
-                              {session.helper?.display_name?.charAt(0) || 'H'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{session.helper?.display_name || 'Professional'}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Rate: ₹{session.hourly_rate / 100}/hour
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(session.created_at).toLocaleString()}
-                              {session.duration_minutes > 0 && ` • ${session.duration_minutes} minutes`}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={session.status === 'active' ? 'default' : 'secondary'}>
-                            {session.status}
-                          </Badge>
-                          {session.status === 'active' && (
-                            <Badge variant="outline" className="text-green-600 border-green-600">
-                              Live
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Browse Professionals Section */}
-            <div className="flex flex-col gap-4">
+            {/* Chat History Dropdown for Clients */}
+            <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-bold">Find Professional Help</h2>
                 <p className="text-muted-foreground">
                   Connect with experts and get instant professional consultation
                 </p>
               </div>
-              
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or specialty..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              {chatHistory.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <History className="h-4 w-4" />
+                      Chat History
+                      <Badge variant="secondary" className="ml-1">
+                        {chatHistory.length}
+                      </Badge>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 bg-card border border-border shadow-lg">
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      Your Chat Sessions
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <div className="max-h-80 overflow-y-auto">
+                      {chatHistory.map((session) => (
+                        <DropdownMenuItem 
+                          key={session.id} 
+                          className="p-3 cursor-pointer focus:bg-muted"
+                          onClick={() => navigate(`/chat/${session.id}`)}
+                        >
+                          <div className="flex items-center gap-3 w-full">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={session.helper?.avatar_url} />
+                              <AvatarFallback className="text-xs">
+                                {session.helper?.display_name?.charAt(0) || 'H'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">
+                                {session.helper?.display_name || 'Professional'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                ₹{session.hourly_rate / 100}/hour
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(session.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge 
+                                variant={session.status === 'active' ? 'default' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {session.status}
+                              </Badge>
+                              {session.status === 'active' && (
+                                <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                                  Live
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or specialty..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
             
             {isLoadingHelpers ? (
