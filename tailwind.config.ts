@@ -26,7 +26,8 @@ export default {
 				foreground: 'hsl(var(--foreground))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))'
+					foreground: 'hsl(var(--primary-foreground))',
+					glow: 'hsl(var(--primary-glow))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
@@ -51,6 +52,18 @@ export default {
 				card: {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
+				},
+				// Chat app specific colors
+				chat: {
+					'bubble-sent': 'hsl(var(--chat-bubble-sent))',
+					'bubble-received': 'hsl(var(--chat-bubble-received))'
+				},
+				status: {
+					online: 'hsl(var(--online-indicator))',
+					typing: 'hsl(var(--typing-indicator))',
+					success: 'hsl(var(--success))',
+					warning: 'hsl(var(--warning))',
+					info: 'hsl(var(--info))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
