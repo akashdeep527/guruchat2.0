@@ -43,11 +43,15 @@ const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingHelpers, setIsLoadingHelpers] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
   useEffect(() => {
     fetchHelpers();
     checkAdminRole();
-  }, [user]);
+    if (user && profile?.is_helper) {
+      fetchPendingRequests();
+    }
+  }, [user, profile]);
 
   const checkAdminRole = async () => {
     if (!user) return;
@@ -93,6 +97,28 @@ const HomePage = () => {
     }
   };
 
+  // Fetch pending chat requests for professionals
+  const fetchPendingRequests = async () => {
+    if (!user || !profile?.is_helper) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .select(`
+          *,
+          client:profiles!chat_sessions_client_id_fkey(display_name, avatar_url)
+        `)
+        .eq('helper_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPendingRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching pending requests:', error);
+    }
+  };
+
   const startChat = async (helperId: string, helperRate: number) => {
     if (!user || !profile) return;
 
@@ -119,6 +145,42 @@ const HomePage = () => {
       toast({
         title: "Error",
         description: "Failed to start chat session",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Accept or reject chat request
+  const handleChatRequest = async (sessionId: string, action: 'accept' | 'reject') => {
+    try {
+      const status = action === 'accept' ? 'active' : 'cancelled';
+      const updates: any = { status };
+      
+      if (action === 'accept') {
+        updates.started_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('chat_sessions')
+        .update(updates)
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      toast({
+        title: action === 'accept' ? "Chat request accepted!" : "Chat request rejected",
+        description: action === 'accept' 
+          ? "You can now start chatting with the client." 
+          : "The request has been declined."
+      });
+
+      // Refresh pending requests
+      fetchPendingRequests();
+    } catch (error: any) {
+      console.error('Error handling chat request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to handle chat request",
         variant: "destructive"
       });
     }
@@ -274,6 +336,68 @@ const HomePage = () => {
                     Edit Profile
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Pending Chat Requests */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  Pending Chat Requests
+                  {pendingRequests.length > 0 && (
+                    <Badge variant="destructive">{pendingRequests.length}</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Manage incoming chat requests from clients
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingRequests.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    No pending chat requests at the moment
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingRequests.map((request) => (
+                      <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={request.client?.avatar_url} />
+                            <AvatarFallback>
+                              {request.client?.display_name?.charAt(0) || 'C'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{request.client?.display_name || 'Client'}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Rate: ₹{request.hourly_rate / 100}/hour
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(request.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleChatRequest(request.id, 'accept')}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleChatRequest(request.id, 'reject')}
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
