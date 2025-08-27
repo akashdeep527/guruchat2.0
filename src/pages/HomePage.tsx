@@ -39,6 +39,8 @@ const HomePage = () => {
   const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // State declarations
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingHelpers, setIsLoadingHelpers] = useState(true);
