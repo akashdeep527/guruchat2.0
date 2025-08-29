@@ -23,7 +23,8 @@ import {
   Search,
   Shield,
   ChevronDown,
-  History
+  History,
+  Package
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -36,7 +37,7 @@ import {
 import { MoreVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, Navigate } from 'react-router-dom';
-import Marketplace from '@/components/Marketplace';
+
 
 interface Helper {
   id: string;
@@ -77,16 +78,16 @@ const HomePage = () => {
 
   // Handle redirect when user is not authenticated
   useEffect(() => {
-    console.log('HomePage auth state:', { loading, user: !!user, profile: !!profile });
     if (!loading && (!user || !profile)) {
-      console.log('Redirecting to home page due to no auth...');
       navigate('/', { replace: true });
     }
   }, [loading, user, profile, navigate]);
 
   useEffect(() => {
     // If no user or profile, don't fetch data
-    if (!user || !profile) return;
+    if (!user || !profile) {
+      return;
+    }
     
     fetchHelpers();
     checkAdminRole();
@@ -527,6 +528,15 @@ const HomePage = () => {
                 </p>
               </div>
               <div className="hidden md:flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/marketplace')}
+                  className="gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  Marketplace
+                </Button>
                 {!profile?.is_helper && (
                   <Button variant="outline" size="sm" onClick={() => setIsRechargeOpen(true)}>
                     Wallet: ₹{Math.floor(walletPaise/100)}
@@ -545,6 +555,10 @@ const HomePage = () => {
                   <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate('/marketplace')}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Marketplace
+                  </DropdownMenuItem>
                   {!profile?.is_helper && (
                     <DropdownMenuItem onClick={() => setIsRechargeOpen(true)}>Recharge Wallet</DropdownMenuItem>
                   )}
@@ -769,10 +783,7 @@ const HomePage = () => {
               </DropdownMenu>
             </div>
 
-            {/* Marketplace Section for Professionals */}
-            <div className="border-t pt-8">
-              <Marketplace />
-            </div>
+
           </div>
         ) : (
           // Client Dashboard - Browse Professionals & Chat History
@@ -949,10 +960,7 @@ const HomePage = () => {
               </Card>
             )}
 
-            {/* Marketplace Section */}
-            <div className="border-t pt-8">
-              <Marketplace />
-            </div>
+
           </div>
         )}
       </main>

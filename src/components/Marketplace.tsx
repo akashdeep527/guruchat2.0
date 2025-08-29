@@ -96,6 +96,7 @@ const Marketplace = () => {
   const [products, setProducts] = useState<DigitalProduct[]>([]);
   const [userProducts, setUserProducts] = useState<DigitalProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
@@ -128,25 +129,34 @@ const Marketplace = () => {
       setCategories(data);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      setError(`Failed to fetch categories: ${error}`);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch product categories',
+        variant: 'destructive',
+      });
     }
   };
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const filters: any = {};
-      if (selectedCategory) filters.category_id = selectedCategory;
+      if (selectedCategory && selectedCategory !== 'all') filters.category_id = selectedCategory;
       if (searchQuery) filters.search = searchQuery;
       if (priceRange.min) filters.min_price = parseInt(priceRange.min) * 100;
       if (priceRange.max) filters.max_price = parseInt(priceRange.max) * 100;
       
       const data = await getDigitalProducts(filters);
       setProducts(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching products:', error);
+      setError(`Failed to fetch products: ${error.message}`);
       toast({
         title: 'Error',
-        description: 'Failed to fetch products',
+        description: `Failed to fetch products: ${error.message}`,
         variant: 'destructive',
       });
     } finally {
@@ -203,7 +213,7 @@ const Marketplace = () => {
         title: productForm.title,
         description: productForm.description,
         price_paise: parseInt(productForm.price_paise) * 100,
-        category_id: productForm.category_id || null,
+        category_id: productForm.category_id === 'none' ? null : productForm.category_id,
         product_type: productForm.product_type,
         thumbnail_url: productForm.thumbnail_url || null,
         preview_url: productForm.preview_url || null,
@@ -244,7 +254,7 @@ const Marketplace = () => {
       title: product.title,
       description: product.description || '',
       price_paise: (product.price_paise / 100).toString(),
-      category_id: product.category_id || '',
+      category_id: product.category_id || 'none',
       product_type: product.product_type,
       thumbnail_url: product.thumbnail_url || '',
       preview_url: product.preview_url || '',
@@ -278,7 +288,7 @@ const Marketplace = () => {
       title: '',
       description: '',
       price_paise: '',
-      category_id: '',
+      category_id: 'none',
       product_type: 'single',
       thumbnail_url: '',
       preview_url: '',
@@ -308,6 +318,26 @@ const Marketplace = () => {
     }
   };
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Marketplace Error</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => {
+            setError(null);
+            fetchCategories();
+            fetchProducts();
+          }}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -335,6 +365,8 @@ const Marketplace = () => {
         )}
       </div>
 
+
+
       {/* Search and Filters */}
       <Card className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -354,7 +386,7 @@ const Marketplace = () => {
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.icon} {category.name}
@@ -413,6 +445,14 @@ const Marketplace = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12">
+              <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Products Available</h3>
+              <p className="text-muted-foreground">
+                No digital products are currently listed in the marketplace.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -631,6 +671,7 @@ const Marketplace = () => {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">No Category</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.icon} {category.name}

@@ -55,9 +55,23 @@ export async function getDigitalProducts(filters?: {
   let query = supabase
     .from('digital_products')
     .select(`
-      *,
-      product_categories(name, icon),
-      profiles!digital_products_seller_id_fkey(display_name, avatar_url)
+      id,
+      title,
+      description,
+      price_paise,
+      category_id,
+      product_type,
+      thumbnail_url,
+      preview_url,
+      tags,
+      rating,
+      review_count,
+      total_sales,
+      seller_id,
+      created_at,
+      updated_at,
+      product_categories!fk_digital_products_category_id(name, description, icon),
+      profiles!fk_digital_products_seller_id(display_name, avatar_url)
     `)
     .eq('is_active', true)
     .order('created_at', { ascending: false });
@@ -79,8 +93,11 @@ export async function getDigitalProducts(filters?: {
   }
 
   const { data, error } = await query;
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error('Supabase error in getDigitalProducts:', error);
+    throw error;
+  }
+  return data || [];
 }
 
 export async function createDigitalProduct(product: {
@@ -150,11 +167,13 @@ export async function purchaseDigitalProduct(productId: string) {
   if (!user) throw new Error('User not authenticated');
 
   const { data, error } = await supabase.rpc('purchase_digital_product', {
-    _product_id: productId,
-    _buyer_id: user.id,
+    _product_id: productId
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Supabase error in purchaseDigitalProduct:', error);
+    throw error;
+  }
   return data;
 }
 
@@ -162,33 +181,62 @@ export async function getUserProducts(userId: string) {
   const { data, error } = await supabase
     .from('digital_products')
     .select(`
-      *,
-      product_categories(name, icon)
+      id,
+      title,
+      description,
+      price_paise,
+      category_id,
+      product_type,
+      thumbnail_url,
+      preview_url,
+      tags,
+      rating,
+      review_count,
+      total_sales,
+      total_revenue_paise,
+      is_active,
+      seller_id,
+      created_at,
+      updated_at,
+      product_categories!fk_digital_products_category_id(name, description, icon)
     `)
     .eq('seller_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error('Supabase error in getUserProducts:', error);
+    throw error;
+  }
+  return data || [];
 }
 
 export async function getUserPurchases(userId: string) {
   const { data, error } = await supabase
     .from('product_orders')
     .select(`
-      *,
+      id,
+      product_id,
+      buyer_id,
+      seller_id,
+      amount_paise,
+      status,
+      created_at,
+      completed_at,
       digital_products(
         title,
         thumbnail_url,
         preview_url,
-        product_categories(name, icon)
+        product_categories!fk_digital_products_category_id(name, description, icon)
       )
     `)
     .eq('buyer_id', userId)
-    .order('purchased_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error('Supabase error in getUserPurchases:', error);
+    throw error;
+  }
+  return data || [];
 }
 
 export async function addProductReview(productId: string, rating: number, comment?: string) {
