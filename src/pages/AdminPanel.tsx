@@ -25,6 +25,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Table, 
@@ -53,6 +54,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Navigate } from 'react-router-dom';
+import { creditWallet, getUserIdByEmail } from '@/integrations/supabase/client';
 
 interface AdminStats {
   totalUsers: number;
@@ -77,6 +79,7 @@ interface UserWithRole {
   created_at: string;
   email?: string;
   roles: string[];
+  wallet_balance?: number; // paise
 }
 
 interface ChatSession {
@@ -112,6 +115,8 @@ const AdminPanel = () => {
   const { user, profile, loading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+  const [walletUserId, setWalletUserId] = useState('');
+  const [walletAmount, setWalletAmount] = useState<number>(0);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -131,13 +136,23 @@ const AdminPanel = () => {
           _role: 'admin'
         });
 
-        if (error) {
-          console.error('Error checking admin role:', error);
-          setIsAdmin(false);
+        if (!error && data === true) {
+          setIsAdmin(true);
           return;
         }
 
-        setIsAdmin(data);
+        // Fallback: direct table check if RPC unavailable/returns false
+        const { data: roles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .limit(1);
+        if (!rolesError && roles && roles.length > 0) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
       } catch (error) {
         console.error('Error in checkAdminRole:', error);
         setIsAdmin(false);
@@ -206,10 +221,22 @@ const AdminPanel = () => {
 
       if (rolesError) throw rolesError;
 
+      // Fetch wallet balances
+      const userIds = (profiles || []).map(p => p.user_id);
+      let walletsMap = new Map<string, number>();
+      if (userIds.length > 0) {
+        const { data: wallets } = await supabase
+          .from('wallets')
+          .select('user_id, balance')
+          .in('user_id', userIds);
+        walletsMap = new Map((wallets || []).map(w => [w.user_id as string, Number(w.balance)]));
+      }
+
       // Combine data
       const usersWithRoles: UserWithRole[] = profiles?.map(profile => ({
         ...profile,
-        roles: userRoles?.filter(r => r.user_id === profile.user_id).map(r => r.role) || []
+        roles: userRoles?.filter(r => r.user_id === profile.user_id).map(r => r.role) || [],
+        wallet_balance: walletsMap.get(profile.user_id) ?? 0
       })) || [];
 
       setUsers(usersWithRoles);
@@ -429,8 +456,98 @@ const AdminPanel = () => {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="sessions">Sessions</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="wallet">Wallet</TabsTrigger>
           </TabsList>
+          <TabsContent value="wallet" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Wallet Management</CardTitle>
+                <CardDescription>Manually credit funds to a user's wallet.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="wallet-lookup">Lookup user (email, name, or UUID)</Label>
+                    <div className="flex gap-2">
+                      <Input id="wallet-lookup" placeholder="Search email, display name or paste UUID" onKeyDown={async (e) => {
+                        if (e.key !== 'Enter') return;
+                        const term = (e.currentTarget as HTMLInputElement).value.trim();
+                        if (!term) return;
+                        // If likely UUID, set directly
+                        if (/^[0-9a-fA-F-]{36}$/.test(term)) {
+                          setWalletUserId(term);
+                          toast({ title: 'UUID set', description: term });
+                          return;
+                        }
+                        // If looks like email, resolve via RPC (auth.users)
+                        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(term)) {
+                          try {
+                            const id = await getUserIdByEmail(term);
+                            if (id) {
+                              setWalletUserId(id);
+                              toast({ title: 'User found', description: id });
+                              return;
+                            }
+                            toast({ title: 'No user found', description: 'Email did not match any user', variant: 'destructive' });
+                            return;
+                          } catch (err: any) {
+                            toast({ title: 'Lookup failed', description: err.message, variant: 'destructive' });
+                            return;
+                          }
+                        }
+                        // Search profiles by display name (case-insensitive)
+                        const { data, error } = await supabase
+                          .from('profiles')
+                          .select('user_id, display_name')
+                          .ilike('display_name', `%${term}%`)
+                          .limit(5);
+                        if (error) {
+                          toast({ title: 'Lookup failed', description: error.message, variant: 'destructive' });
+                          return;
+                        }
+                        if (!data || data.length === 0) {
+                          toast({ title: 'No user found', description: 'Try a different name or paste UUID', variant: 'destructive' });
+                          return;
+                        }
+                        if (data.length === 1) {
+                          setWalletUserId(data[0].user_id);
+                          toast({ title: 'User selected', description: `${data[0].display_name}` });
+                        } else {
+                          setWalletUserId(data[0].user_id);
+                          toast({ title: 'Multiple matches', description: `Selected first: ${data[0].display_name}` });
+                        }
+                      }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Press Enter to search by email (preferred), display name, or paste a UUID directly.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="wallet-user">User ID</Label>
+                    <Input id="wallet-user" placeholder="UUID of user" value={walletUserId} onChange={(e) => setWalletUserId(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="wallet-amount">Amount (₹)</Label>
+                    <Input id="wallet-amount" type="number" min={1} value={walletAmount || ''} onChange={(e) => setWalletAmount(Number(e.target.value))} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={async () => {
+                      if (!walletUserId || !walletAmount) return;
+                      const paise = Math.round(walletAmount * 100);
+                      const { error } = await creditWallet(walletUserId, paise, 'Admin credit');
+                      if (error) {
+                        toast({ title: 'Credit failed', description: error.message, variant: 'destructive' });
+                      } else {
+                        toast({ title: 'Wallet credited', description: `Added ₹${walletAmount} to wallet.` });
+                        setWalletAmount(0);
+                      }
+                    }}>Credit Wallet</Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Note: You must know the user's UUID. Add a lookup UI later.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
             {stats && (
@@ -522,6 +639,7 @@ const AdminPanel = () => {
                       <TableHead>User</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Roles</TableHead>
+                      <TableHead>Balance</TableHead>
                       <TableHead>Stats</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -565,6 +683,9 @@ const AdminPanel = () => {
                                 </Badge>
                               ))}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            ₹{Math.floor((user.wallet_balance || 0) / 100)}
                           </TableCell>
                           <TableCell>
                             {user.is_helper && (

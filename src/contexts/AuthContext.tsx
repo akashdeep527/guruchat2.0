@@ -194,20 +194,33 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signOut = async () => {
     try {
+      console.log('Signing out...');
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error('Sign out error:', error);
         toast({
           title: "Sign out failed",
           description: error.message,
           variant: "destructive"
         });
       } else {
+        console.log('Sign out successful, clearing state...');
+        // Clear local state immediately
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        
         toast({
           title: "Signed out",
           description: "You've been signed out successfully."
         });
+        
+        console.log('Redirecting to home page...');
+        // Force redirect to home page after sign out
+        window.location.href = '/';
       }
     } catch (error: any) {
+      console.error('Sign out exception:', error);
       toast({
         title: "Sign out failed",
         description: error.message,

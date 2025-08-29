@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      wallets: {
+        Row: {
+          user_id: string
+          balance: number
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          balance?: number
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          balance?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          tx_type: Database["public"]["Enums"]["wallet_tx_type"]
+          amount: number
+          reason: string | null
+          reference: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tx_type: Database["public"]["Enums"]["wallet_tx_type"]
+          amount: number
+          reason?: string | null
+          reference?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tx_type?: Database["public"]["Enums"]["wallet_tx_type"]
+          amount?: number
+          reason?: string | null
+          reference?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       chat_sessions: {
         Row: {
           client_id: string
@@ -216,10 +264,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      credit_wallet: {
+        Args: { _user_id: string; _amount: number; _reason?: string | null; _reference?: string | null }
+        Returns: void
+      }
+      debit_wallet: {
+        Args: { _user_id: string; _amount: number; _reason?: string | null; _reference?: string | null }
+        Returns: void
+      }
     }
     Enums: {
       app_role: "user" | "admin" | "helper"
       session_status: "pending" | "active" | "completed" | "cancelled"
+      wallet_tx_type: "credit" | "debit"
     }
     CompositeTypes: {
       [_ in never]: never

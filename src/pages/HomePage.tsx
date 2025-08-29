@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getWalletBalance, creditWallet } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -28,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+import { MoreVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, Navigate } from 'react-router-dom';
 
@@ -46,14 +51,11 @@ interface Helper {
 }
 
 const HomePage = () => {
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading, updateProfile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Redirect to landing page if not authenticated
-  if (!loading && (!user || !profile)) {
-    return <Navigate to="/" replace />;
-  }
+
   
   // State declarations
   const [helpers, setHelpers] = useState<Helper[]>([]);
@@ -62,16 +64,40 @@ const HomePage = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isRechargeOpen, setIsRechargeOpen] = useState(false);
+  const [walletPaise, setWalletPaise] = useState<number>(0);
+  const [rechargeAmount, setRechargeAmount] = useState<number>(0);
+  const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [hourlyRate, setHourlyRate] = useState<number | undefined>(undefined);
+  const [specialtiesText, setSpecialtiesText] = useState('');
+  const [isAvailable, setIsAvailable] = useState<boolean>(true);
+
+  // Handle redirect when user is not authenticated
+  useEffect(() => {
+    console.log('HomePage auth state:', { loading, user: !!user, profile: !!profile });
+    if (!loading && (!user || !profile)) {
+      console.log('Redirecting to home page due to no auth...');
+      navigate('/', { replace: true });
+    }
+  }, [loading, user, profile, navigate]);
 
   useEffect(() => {
+    // If no user or profile, don't fetch data
+    if (!user || !profile) return;
+    
     fetchHelpers();
     checkAdminRole();
-    if (user && profile?.is_helper) {
+    if (profile?.is_helper) {
       fetchPendingRequests();
       fetchProfessionalSessions();
-    }
-    if (user && !profile?.is_helper) {
+    } else {
       fetchClientSessions();
+    }
+    // Fetch wallet
+    if (user) {
+      getWalletBalance(user.id).then(setWalletPaise).catch(() => {});
     }
   }, [user, profile]);
 
@@ -120,6 +146,18 @@ const HomePage = () => {
       });
 
       if (!error && data) {
+        setIsAdmin(true);
+        return;
+      }
+
+      // Fallback: direct table check if RPC not available or returned false
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .limit(1);
+      if (!rolesError && roles && roles.length > 0) {
         setIsAdmin(true);
       }
     } catch (error) {
@@ -277,6 +315,17 @@ const HomePage = () => {
 
   const startChat = async (helperId: string, helperRate: number) => {
     if (!user || !profile) return;
+    // Require balance >= 10 minutes of rate as hold (customizable)
+    const required = helperRate * 100 * 5; // 5 minutes in paise
+    if (walletPaise < required) {
+      toast({
+        title: 'Insufficient wallet balance',
+        description: 'Please recharge your wallet to start a chat.',
+        variant: 'destructive'
+      });
+      setIsRechargeOpen(true);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -304,6 +353,57 @@ const HomePage = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // Open edit modal prefilled
+  const openEdit = () => {
+    if (!profile) return;
+    setDisplayName(profile.display_name || '');
+    setBio(profile.bio || '');
+    setHourlyRate(profile.hourly_rate ?? undefined);
+    setSpecialtiesText((profile.specialties || []).join(', '));
+    setIsAvailable(profile.is_available ?? true);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveProfile = async () => {
+    const updates: any = {
+      display_name: displayName,
+      bio,
+    };
+
+    if (typeof hourlyRate === 'number' && !Number.isNaN(hourlyRate)) {
+      updates.hourly_rate = hourlyRate;
+    }
+
+    const specialties = specialtiesText
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    updates.specialties = specialties.length ? specialties : [];
+
+    updates.is_available = isAvailable;
+
+    const { error } = await updateProfile(updates);
+    if (!error) {
+      await refreshProfile();
+      setIsEditOpen(false);
+    }
+  };
+
+  const handleRecharge = async () => {
+    if (!user || rechargeAmount <= 0) return;
+    const paise = Math.round(rechargeAmount * 100);
+    const { error } = await creditWallet(user.id, paise, 'UPI recharge');
+    if (error) {
+      toast({ title: 'Recharge failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const newBal = await getWalletBalance(user.id);
+    setWalletPaise(newBal);
+    setIsRechargeOpen(false);
+    setRechargeAmount(0);
+    toast({ title: 'Wallet recharged', description: `Added ₹${paise/100} to your wallet.` });
   };
 
   // Accept or reject chat request
@@ -368,6 +468,11 @@ const HomePage = () => {
     );
   }
 
+  // Don't render anything if user is not authenticated (redirect will happen in useEffect)
+  if (!user || !profile) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/80">
       {/* Header */}
@@ -386,7 +491,7 @@ const HomePage = () => {
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {isAdmin && (
                 <Button 
                   variant="outline" 
@@ -420,9 +525,33 @@ const HomePage = () => {
                   )}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={signOut}>
-                <LogOut className="h-4 w-4" />
-              </Button>
+              <div className="hidden md:flex items-center gap-2">
+                {!profile?.is_helper && (
+                  <Button variant="outline" size="sm" onClick={() => setIsRechargeOpen(true)}>
+                    Wallet: ₹{Math.floor(walletPaise/100)}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={openEdit}>
+                  Edit Profile
+                </Button>
+                <Button variant="ghost" size="sm" onClick={signOut}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+              {/* Mobile actions */}
+              <DropdownMenu>
+                <DropdownMenuTrigger className="md:hidden inline-flex items-center justify-center rounded-md border bg-card px-2 py-2">
+                  <MoreVertical className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {!profile?.is_helper && (
+                    <DropdownMenuItem onClick={() => setIsRechargeOpen(true)}>Recharge Wallet</DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={openEdit}>Edit Profile</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut}>Sign Out</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -496,7 +625,7 @@ const HomePage = () => {
                       ))}
                     </div>
                   </div>
-                  <Button variant="outline">
+                  <Button variant="outline" onClick={openEdit}>
                     <Settings className="h-4 w-4 mr-2" />
                     Edit Profile
                   </Button>
@@ -816,6 +945,85 @@ const HomePage = () => {
           </div>
         )}
       </main>
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit profile</DialogTitle>
+            <DialogDescription>Update your public profile information.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="display_name">Display name</Label>
+              <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} rows={4} />
+            </div>
+
+            {profile?.is_helper && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="hourly_rate">Hourly rate (₹)</Label>
+                  <Input
+                    id="hourly_rate"
+                    type="number"
+                    min={0}
+                    value={hourlyRate ?? ''}
+                    onChange={(e) => setHourlyRate(e.target.value === '' ? undefined : Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="specialties">Specialties (comma separated)</Label>
+                  <Input id="specialties" value={specialtiesText} onChange={(e) => setSpecialtiesText(e.target.value)} />
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Available for sessions</p>
+                    <p className="text-xs text-muted-foreground">Toggle your availability status</p>
+                  </div>
+                  <Switch checked={isAvailable} onCheckedChange={setIsAvailable} />
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveProfile}>Save changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Recharge Wallet Dialog */}
+      <Dialog open={isRechargeOpen} onOpenChange={setIsRechargeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recharge Wallet</DialogTitle>
+            <DialogDescription>Pay via UPI and the amount will be credited to your wallet.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Current balance</p>
+              <p className="font-medium">₹{Math.floor(walletPaise/100)}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Amount (₹)</Label>
+              <Input id="amount" type="number" min={1} value={rechargeAmount || ''} onChange={(e) => setRechargeAmount(Number(e.target.value))} />
+            </div>
+            <p className="text-xs text-muted-foreground">UPI simulation: clicking Recharge will credit the amount to your wallet.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsRechargeOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecharge} disabled={!rechargeAmount || rechargeAmount <= 0}>Recharge</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -15,3 +15,22 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+export async function getWalletBalance(userId: string) {
+  const { data } = await supabase.from('wallets').select('balance').eq('user_id', userId).single();
+  return data?.balance ?? 0;
+}
+
+export async function creditWallet(userId: string, amountPaise: number, reason?: string, reference?: string) {
+  return supabase.rpc('credit_wallet', { _user_id: userId, _amount: amountPaise, _reason: reason ?? null, _reference: reference ?? null });
+}
+
+export async function debitWallet(userId: string, amountPaise: number, reason?: string, reference?: string) {
+  return supabase.rpc('debit_wallet', { _user_id: userId, _amount: amountPaise, _reason: reason ?? null, _reference: reference ?? null });
+}
+
+export async function getUserIdByEmail(email: string) {
+  const { data, error } = await supabase.rpc('get_user_id_by_email', { _email: email });
+  if (error) throw error;
+  return data as string | null;
+}
