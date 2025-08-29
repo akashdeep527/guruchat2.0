@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 
 interface Helper {
   id: string;
@@ -49,6 +49,11 @@ const HomePage = () => {
   const { user, profile, signOut, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Redirect to landing page if not authenticated
+  if (!loading && (!user || !profile)) {
+    return <Navigate to="/" replace />;
+  }
   
   // State declarations
   const [helpers, setHelpers] = useState<Helper[]>([]);
