@@ -62,6 +62,211 @@ export type Database = {
         }
         Relationships: []
       }
+      product_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          icon: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      digital_products: {
+        Row: {
+          id: string
+          seller_id: string
+          title: string
+          description: string | null
+          price_paise: number
+          category_id: string | null
+          product_type: string
+          file_urls: string[] | null
+          thumbnail_url: string | null
+          preview_url: string | null
+          tags: string[] | null
+          is_active: boolean
+          total_sales: number
+          total_revenue_paise: number
+          rating: number | null
+          review_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          seller_id: string
+          title: string
+          description?: string | null
+          price_paise: number
+          category_id?: string | null
+          product_type: string
+          file_urls?: string[] | null
+          thumbnail_url?: string | null
+          preview_url?: string | null
+          tags?: string[] | null
+          is_active?: boolean
+          total_sales?: number
+          total_revenue_paise?: number
+          rating?: number | null
+          review_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          seller_id?: string
+          title?: string
+          description?: string | null
+          price_paise?: number
+          category_id?: string | null
+          product_type?: string
+          file_urls?: string[] | null
+          thumbnail_url?: string | null
+          preview_url?: string | null
+          tags?: string[] | null
+          is_active?: boolean
+          total_sales?: number
+          total_revenue_paise?: number
+          rating?: number | null
+          review_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digital_products_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digital_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      product_orders: {
+        Row: {
+          id: string
+          buyer_id: string
+          product_id: string
+          seller_id: string
+          amount_paise: number
+          status: string
+          download_urls: string[] | null
+          purchased_at: string
+          expires_at: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          id?: string
+          buyer_id: string
+          product_id: string
+          seller_id: string
+          amount_paise: number
+          status?: string
+          download_urls?: string[] | null
+          purchased_at?: string
+          expires_at?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          id?: string
+          buyer_id?: string
+          product_id?: string
+          seller_id?: string
+          amount_paise?: number
+          status?: string
+          download_urls?: string[] | null
+          purchased_at?: string
+          expires_at?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_orders_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "digital_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      product_reviews: {
+        Row: {
+          id: string
+          product_id: string
+          reviewer_id: string
+          rating: number
+          comment: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          reviewer_id: string
+          rating: number
+          comment?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          reviewer_id?: string
+          rating?: number
+          comment?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "digital_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       chat_sessions: {
         Row: {
           client_id: string

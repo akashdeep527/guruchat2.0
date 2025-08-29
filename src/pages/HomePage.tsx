@@ -36,6 +36,7 @@ import {
 import { MoreVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, Navigate } from 'react-router-dom';
+import Marketplace from '@/components/Marketplace';
 
 interface Helper {
   id: string;
@@ -767,6 +768,11 @@ const HomePage = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {/* Marketplace Section for Professionals */}
+            <div className="border-t pt-8">
+              <Marketplace />
+            </div>
           </div>
         ) : (
           // Client Dashboard - Browse Professionals & Chat History
@@ -942,6 +948,11 @@ const HomePage = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Marketplace Section */}
+            <div className="border-t pt-8">
+              <Marketplace />
+            </div>
           </div>
         )}
       </main>

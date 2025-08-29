@@ -34,3 +34,178 @@ export async function getUserIdByEmail(email: string) {
   if (error) throw error;
   return data as string | null;
 }
+
+// Marketplace functions
+export async function getProductCategories() {
+  const { data, error } = await supabase
+    .from('product_categories')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data;
+}
+
+export async function getDigitalProducts(filters?: {
+  category_id?: string;
+  search?: string;
+  min_price?: number;
+  max_price?: number;
+  seller_id?: string;
+}) {
+  let query = supabase
+    .from('digital_products')
+    .select(`
+      *,
+      product_categories(name, icon),
+      profiles!digital_products_seller_id_fkey(display_name, avatar_url)
+    `)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (filters?.category_id) {
+    query = query.eq('category_id', filters.category_id);
+  }
+  if (filters?.search) {
+    query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+  }
+  if (filters?.min_price !== undefined) {
+    query = query.gte('price_paise', filters.min_price);
+  }
+  if (filters?.max_price !== undefined) {
+    query = query.lte('price_paise', filters.max_price);
+  }
+  if (filters?.seller_id) {
+    query = query.eq('seller_id', filters.seller_id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+export async function createDigitalProduct(product: {
+  title: string;
+  description?: string;
+  price_paise: number;
+  category_id?: string;
+  product_type: string;
+  file_urls?: string[];
+  thumbnail_url?: string;
+  preview_url?: string;
+  tags?: string[];
+}) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase
+    .from('digital_products')
+    .insert({
+      ...product,
+      seller_id: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateDigitalProduct(id: string, updates: Partial<{
+  title: string;
+  description: string;
+  price_paise: number;
+  category_id: string;
+  product_type: string;
+  file_urls: string[];
+  thumbnail_url: string;
+  preview_url: string;
+  tags: string[];
+  is_active: boolean;
+}>) {
+  const { data, error } = await supabase
+    .from('digital_products')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteDigitalProduct(id: string) {
+  const { error } = await supabase
+    .from('digital_products')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+export async function purchaseDigitalProduct(productId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase.rpc('purchase_digital_product', {
+    _product_id: productId,
+    _buyer_id: user.id,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getUserProducts(userId: string) {
+  const { data, error } = await supabase
+    .from('digital_products')
+    .select(`
+      *,
+      product_categories(name, icon)
+    `)
+    .eq('seller_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getUserPurchases(userId: string) {
+  const { data, error } = await supabase
+    .from('product_orders')
+    .select(`
+      *,
+      digital_products(
+        title,
+        thumbnail_url,
+        preview_url,
+        product_categories(name, icon)
+      )
+    `)
+    .eq('buyer_id', userId)
+    .order('purchased_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function addProductReview(productId: string, rating: number, comment?: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase
+    .from('product_reviews')
+    .upsert({
+      product_id: productId,
+      reviewer_id: user.id,
+      rating,
+      comment,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
