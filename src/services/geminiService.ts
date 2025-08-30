@@ -1,10 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiApiKey } from '@/config/api';
 
-// Initialize Gemini with API key from environment
-const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY || '');
+// Initialize Gemini with API key from config
+const genAI = new GoogleGenerativeAI(getGeminiApiKey());
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  private model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  
+  // Fallback models if the primary one fails
+  private fallbackModels = ['gemini-1.5-pro', 'gemini-1.0-pro'];
 
   async generateResponse(params: {
     clientMessage: string;
@@ -17,11 +21,19 @@ export class GeminiService {
     responseType: 'greeting' | 'consultation' | 'followup' | 'closing';
     previousContext?: string;
   }) {
+    // Try primary model first
     try {
+      console.log('🔍 Gemini Service: Starting response generation with gemini-2.0-flash-exp');
+      console.log('🔑 API Key available:', !!getGeminiApiKey());
+      console.log('📝 Client message:', params.clientMessage);
+      
       const prompt = this.buildPrompt(params);
+      console.log('📋 Generated prompt length:', prompt.length);
       
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
+      
+      console.log('✅ Gemini API success with gemini-2.0-flash-exp');
       
       return {
         success: true,
@@ -29,7 +41,40 @@ export class GeminiService {
         usage: result.usageMetadata
       };
     } catch (error) {
-      console.error('Gemini API error:', error);
+      console.error('❌ Gemini API error with gemini-2.0-flash-exp:', error);
+      
+      // Try fallback models
+      for (const fallbackModel of this.fallbackModels) {
+        try {
+          console.log(`🔄 Trying fallback model: ${fallbackModel}`);
+          const fallbackGenAI = new GoogleGenerativeAI(getGeminiApiKey());
+          const fallbackModelInstance = fallbackGenAI.getGenerativeModel({ model: fallbackModel });
+          
+          const prompt = this.buildPrompt(params);
+          const result = await fallbackModelInstance.generateContent(prompt);
+          const response = await result.response;
+          
+          console.log(`✅ Gemini API success with ${fallbackModel}`);
+          
+          return {
+            success: true,
+            response: response.text(),
+            usage: result.usageMetadata
+          };
+        } catch (fallbackError) {
+          console.error(`❌ Fallback model ${fallbackModel} failed:`, fallbackError);
+          continue;
+        }
+      }
+      
+      // All models failed
+      console.error('❌ All Gemini models failed');
+      console.error('Final error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

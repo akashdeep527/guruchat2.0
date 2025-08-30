@@ -24,7 +24,9 @@ import {
   Shield,
   ChevronDown,
   History,
-  Package
+  Package,
+  Bot,
+  BookOpen
 } from 'lucide-react';
 import { 
   DropdownMenu,

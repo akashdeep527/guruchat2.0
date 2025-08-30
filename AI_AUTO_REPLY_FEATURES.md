@@ -58,9 +58,9 @@ The AI Auto-Reply system powered by Google Gemini AI enables professionals to au
    - Professional profile integration
 
 ### **API Integration**
-- **Endpoint**: `/api/ai/gemini-response`
-- **Method**: POST
-- **Authentication**: Required
+- **Direct Service Integration**: Uses Gemini service directly in React components
+- **Environment Variables**: VITE_GEMINI_API_KEY for API key
+- **Authentication**: Required through AuthContext
 - **Rate Limiting**: Configurable per professional
 
 ## 🚀 Getting Started
@@ -71,7 +71,7 @@ The AI Auto-Reply system powered by Google Gemini AI enables professionals to au
 cp env.example .env.local
 
 # Add your Gemini API key
-REACT_APP_GEMINI_API_KEY=your_actual_api_key_here
+VITE_GEMINI_API_KEY=your_actual_api_key_here
 ```
 
 ### **2. Get Gemini API Key**

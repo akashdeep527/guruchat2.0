@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Send, Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
+import { ArrowLeft, Send, Phone, PhoneOff, Mic, MicOff, Bot, Sparkles, Zap, ZapOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Message {
@@ -48,6 +48,9 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(true);
   const [isVoiceCall, setIsVoiceCall] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [autoTalkEnabled, setAutoTalkEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -217,6 +220,134 @@ const ChatPage = () => {
     }
   };
 
+  // AI Auto-Reply functionality
+  const generateAIResponse = async (autoSend = false) => {
+    if (!profile?.is_helper || !otherUser) return;
+    
+    console.log('🚀 Starting AI response generation...');
+    console.log('👤 Profile:', profile);
+    console.log('👥 Other user:', otherUser);
+    
+    // Get the last client message
+    const lastClientMessage = messages
+      .filter(msg => msg.sender_id !== user?.id)
+      .pop();
+    
+    console.log('💬 Last client message:', lastClientMessage);
+    
+    if (!lastClientMessage) {
+      if (!autoSend) {
+        toast({
+          title: "No client message",
+          description: "Wait for a client message to generate AI response",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    
+    try {
+      console.log('📦 Importing Gemini service...');
+      // Import and use the Gemini service directly
+      const { geminiService } = await import('@/services/geminiService');
+      console.log('✅ Gemini service imported successfully');
+      
+      const aiParams = {
+        clientMessage: lastClientMessage.content,
+        professionalContext: {
+          name: profile.display_name || 'Professional',
+          specialty: profile.specialties?.[0] || 'General Helper',
+          experience: '5+ years', // Profile doesn't have experience field
+          tone: 'friendly'
+        },
+        responseType: 'consultation',
+        previousContext: messages.length > 1 ? 'Ongoing conversation' : undefined
+      };
+      
+      console.log('📋 AI Parameters:', aiParams);
+      
+      const result = await geminiService.generateResponse(aiParams);
+      console.log('🤖 AI Response result:', result);
+      
+      if (result.success) {
+        if (autoSend) {
+          // Auto-send the AI response
+          await sendAIMessage(result.response);
+        } else {
+          // Auto-fill the message input with AI response
+          setNewMessage(result.response);
+        }
+      } else {
+        // Use fallback response
+        const fallback = `Thank you for your message. I understand your concern and I'm here to help. Could you please provide more details so I can give you the best possible assistance?`;
+        if (autoSend) {
+          await sendAIMessage(fallback);
+        } else {
+          setNewMessage(fallback);
+        }
+      }
+    } catch (error) {
+      console.error('❌ AI response generation failed:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      const fallback = `Thank you for reaching out. I'd be happy to help you with this. What specific questions do you have?`;
+      if (autoSend) {
+        await sendAIMessage(fallback);
+      } else {
+        setNewMessage(fallback);
+      }
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // Send AI message directly
+  const sendAIMessage = async (content: string) => {
+    if (!user || !sessionId) return;
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          session_id: sessionId,
+          sender_id: user.id,
+          content: content.trim(),
+          message_type: 'text'
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error sending AI message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send AI message",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Auto-reply when new client message arrives
+  useEffect(() => {
+    if (autoTalkEnabled && profile?.is_helper && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      // Only auto-reply if the last message is from the client and not from us
+      if (lastMessage.sender_id !== user?.id) {
+        // Add a small delay to make it feel more natural
+        const timer = setTimeout(() => {
+          generateAIResponse(true);
+        }, 2000); // 2 second delay
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [messages, autoTalkEnabled, profile?.is_helper]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -263,11 +394,67 @@ const ChatPage = () => {
                 <span className="text-sm text-muted-foreground">
                   ₹{session.hourly_rate / 100}/hour
                 </span>
+                {profile?.is_helper && (
+                  <Badge variant="outline" className="text-xs border-blue-200 text-blue-700 bg-blue-50">
+                    <Bot className="h-3 w-3 mr-1" />
+                    AI Ready
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
+            {/* AI Assistant Controls - Only for professionals */}
+            {profile?.is_helper && (
+              <div className="flex items-center gap-2">
+                {/* Auto-Talk Toggle */}
+                <Button 
+                  variant={autoTalkEnabled ? "default" : "outline"}
+                  size="sm" 
+                  onClick={() => setAutoTalkEnabled(!autoTalkEnabled)}
+                  className={autoTalkEnabled ? 
+                    "bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-500 hover:from-green-600 hover:to-emerald-600" : 
+                    "border-gray-300 hover:bg-gray-50"
+                  }
+                >
+                  {autoTalkEnabled ? (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Auto-Talk ON
+                    </>
+                  ) : (
+                    <>
+                      <ZapOff className="h-4 w-4 mr-2" />
+                      Auto-Talk OFF
+                    </>
+                  )}
+                </Button>
+                
+                {/* Manual AI Reply Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => generateAIResponse(false)}
+                  disabled={isGeneratingAI}
+                  className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-indigo-100"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      AI Thinking...
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="h-4 w-4 mr-2" />
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      AI Reply
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            
             {!isVoiceCall ? (
               <Button variant="outline" size="sm" onClick={startVoiceCall}>
                 <Phone className="h-4 w-4 mr-2" />
@@ -348,6 +535,52 @@ const ChatPage = () => {
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* AI Assistant Info - Only for professionals */}
+          {profile?.is_helper && (
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Bot className="h-3 w-3" />
+                <span>
+                  {autoTalkEnabled ? 
+                    "🤖 Auto-Talk: AI will automatically respond to client messages" : 
+                    "AI Assistant: Generate professional responses instantly"
+                  }
+                </span>
+              </div>
+              
+              {/* Quick AI Actions */}
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setNewMessage("Thank you for reaching out. I'd be happy to help you with this.")}
+                  className="text-xs h-7 px-2"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Thank You
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setNewMessage("I understand your concern. Let me provide you with a detailed solution.")}
+                  className="text-xs h-7 px-2"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Understanding
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setNewMessage("I'll get back to you within the next few hours with a comprehensive answer.")}
+                  className="text-xs h-7 px-2"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Follow Up
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

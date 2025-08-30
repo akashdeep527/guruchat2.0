@@ -55,22 +55,19 @@ const AIAutoReply = ({
     setIsGenerating(true);
     
     try {
-      const response = await fetch('/api/ai/gemini-response', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientMessage,
-          professionalContext,
-          responseType,
-          previousContext
-        })
+      // Import and use the Gemini service directly
+      const { geminiService } = await import('@/services/geminiService');
+      
+      const result = await geminiService.generateResponse({
+        clientMessage,
+        professionalContext,
+        responseType,
+        previousContext
       });
       
-      const data = await response.json();
-      
-      if (data.success) {
-        setAiResponse(data.response);
-        setEditedResponse(data.response);
+      if (result.success) {
+        setAiResponse(result.response);
+        setEditedResponse(result.response);
         setGenerationCount(prev => prev + 1);
         
         toast({
@@ -79,8 +76,8 @@ const AIAutoReply = ({
         });
       } else {
         // Use fallback response
-        setAiResponse(data.fallback);
-        setEditedResponse(data.fallback);
+        setAiResponse(result.fallback);
+        setEditedResponse(result.fallback);
         
         toast({
           title: 'Using Fallback Response',
