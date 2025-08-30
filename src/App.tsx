@@ -11,6 +11,7 @@ import AdminPanel from "./pages/AdminPanel";
 import ChatPage from "./pages/ChatPage";
 import MarketplacePage from "./pages/MarketplacePage";
 import LibraryPage from "./pages/LibraryPage";
+import AIAutoReplyPage from "./pages/AIAutoReplyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/chat/:sessionId" element={<ChatPage />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/library" element={<LibraryPage />} />
+            <Route path="/ai-auto-reply" element={<AIAutoReplyPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -537,6 +537,17 @@ const HomePage = () => {
                   <Package className="h-4 w-4" />
                   Marketplace
                 </Button>
+                {profile?.is_helper && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate('/ai-auto-reply')}
+                    className="gap-2"
+                  >
+                    <Bot className="h-4 w-4" />
+                    AI Assistant
+                  </Button>
+                )}
                 {!profile?.is_helper && (
                   <Button 
                     variant="outline" 
@@ -570,6 +581,12 @@ const HomePage = () => {
                     <Package className="h-4 w-4 mr-2" />
                     Marketplace
                   </DropdownMenuItem>
+                  {profile?.is_helper && (
+                    <DropdownMenuItem onClick={() => navigate('/ai-auto-reply')}>
+                      <Bot className="h-4 w-4 mr-2" />
+                      AI Assistant
+                    </DropdownMenuItem>
+                  )}
                   {!profile?.is_helper && (
                     <DropdownMenuItem onClick={() => navigate('/library')}>
                       <Package className="h-4 w-4 mr-2" />
