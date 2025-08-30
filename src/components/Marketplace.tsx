@@ -112,6 +112,7 @@ const Marketplace = () => {
     product_type: 'single',
     thumbnail_url: '',
     preview_url: '',
+    download_urls: '',
     tags: '',
   });
 
@@ -217,6 +218,7 @@ const Marketplace = () => {
         product_type: productForm.product_type,
         thumbnail_url: productForm.thumbnail_url || null,
         preview_url: productForm.preview_url || null,
+        download_urls: productForm.download_urls ? productForm.download_urls.split(',').map(t => t.trim()) : null,
         tags: productForm.tags ? productForm.tags.split(',').map(t => t.trim()) : null,
       };
 
@@ -258,6 +260,7 @@ const Marketplace = () => {
       product_type: product.product_type,
       thumbnail_url: product.thumbnail_url || '',
       preview_url: product.preview_url || '',
+      download_urls: product.download_urls?.join(', ') || '',
       tags: product.tags?.join(', ') || '',
     });
     setIsProductDialogOpen(true);
@@ -292,6 +295,7 @@ const Marketplace = () => {
       product_type: 'single',
       thumbnail_url: '',
       preview_url: '',
+      download_urls: '',
       tags: '',
     });
   };
@@ -558,6 +562,10 @@ const Marketplace = () => {
                         </Button>
                       )}
                     </div>
+                    
+                    <div className="text-xs text-muted-foreground text-center">
+                      ✓ Download links provided after purchase
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -620,7 +628,14 @@ const Marketplace = () => {
 
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <span>{product.total_sales} sales</span>
-                      <span>₹{(product.total_revenue_paise / 100).toFixed(0)} earned</span>
+                      <div className="text-right">
+                        <div>₹{(product.total_revenue_paise / 100).toFixed(0)} earned</div>
+                        {product.download_urls && product.download_urls.length > 0 && (
+                          <div className="text-xs text-green-600">
+                            {product.download_urls.length} download link{product.download_urls.length > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -724,6 +739,19 @@ const Marketplace = () => {
                 onChange={(e) => setProductForm(prev => ({ ...prev, preview_url: e.target.value }))}
                 placeholder="https://example.com/preview"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="download_urls">Download URLs (comma-separated)</Label>
+              <Input
+                id="download_urls"
+                value={productForm.download_urls}
+                onChange={(e) => setProductForm(prev => ({ ...prev, download_urls: e.target.value }))}
+                placeholder="https://example.com/file1.zip,https://example.com/file2.pdf"
+              />
+              <p className="text-xs text-muted-foreground">
+                These URLs will be revealed to customers after purchase
+              </p>
             </div>
 
             <div className="space-y-2 md:col-span-2">

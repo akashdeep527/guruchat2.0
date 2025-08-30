@@ -109,6 +109,7 @@ export async function createDigitalProduct(product: {
   file_urls?: string[];
   thumbnail_url?: string;
   preview_url?: string;
+  download_urls?: string[];
   tags?: string[];
 }) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -136,6 +137,7 @@ export async function updateDigitalProduct(id: string, updates: Partial<{
   file_urls: string[];
   thumbnail_url: string;
   preview_url: string;
+  download_urls: string[];
   tags: string[];
   is_active: boolean;
 }>) {
@@ -256,4 +258,17 @@ export async function addProductReview(productId: string, rating: number, commen
 
   if (error) throw error;
   return data;
+}
+
+export async function getUserLibrary(userId: string) {
+  const { data, error } = await supabase
+    .from('user_library')
+    .select('*')
+    .order('purchased_at', { ascending: false });
+
+  if (error) {
+    console.error('Supabase error in getUserLibrary:', error);
+    throw error;
+  }
+  return data || [];
 }

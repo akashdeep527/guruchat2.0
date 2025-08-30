@@ -538,6 +538,17 @@ const HomePage = () => {
                   Marketplace
                 </Button>
                 {!profile?.is_helper && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate('/library')}
+                    className="gap-2"
+                  >
+                    <Package className="h-4 w-4" />
+                    My Library
+                  </Button>
+                )}
+                {!profile?.is_helper && (
                   <Button variant="outline" size="sm" onClick={() => setIsRechargeOpen(true)}>
                     Wallet: ₹{Math.floor(walletPaise/100)}
                   </Button>
@@ -559,6 +570,12 @@ const HomePage = () => {
                     <Package className="h-4 w-4 mr-2" />
                     Marketplace
                   </DropdownMenuItem>
+                  {!profile?.is_helper && (
+                    <DropdownMenuItem onClick={() => navigate('/library')}>
+                      <Package className="h-4 w-4 mr-2" />
+                      My Library
+                    </DropdownMenuItem>
+                  )}
                   {!profile?.is_helper && (
                     <DropdownMenuItem onClick={() => setIsRechargeOpen(true)}>Recharge Wallet</DropdownMenuItem>
                   )}

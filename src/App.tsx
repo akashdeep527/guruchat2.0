@@ -10,6 +10,7 @@ import HomePage from "./pages/HomePage";
 import AdminPanel from "./pages/AdminPanel";
 import ChatPage from "./pages/ChatPage";
 import MarketplacePage from "./pages/MarketplacePage";
+import LibraryPage from "./pages/LibraryPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/chat/:sessionId" element={<ChatPage />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
+            <Route path="/library" element={<LibraryPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
